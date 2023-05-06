@@ -22,8 +22,9 @@ import { definePluginSettings } from "@api/settings";
 import { classNameFactory } from "@api/Styles";
 import { Devs } from "@utils/constants";
 import { getTheme, insertTextIntoChatInputBox, Theme } from "@utils/discord";
+import { useIntersection } from "@utils/react";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, ButtonLooks, ButtonWrapperClasses, Forms, React, TextInput, Tooltip, useState } from "@webpack/common";
+import { Button, ButtonLooks, ButtonWrapperClasses, Forms, React, TextInput, Tooltip, useEffect, useRef, useState } from "@webpack/common";
 import { Channel } from "discord-types/general";
 
 const cl = classNameFactory("vc-seventv-");
@@ -41,7 +42,7 @@ let emotes: SevenTVEmote[] = [];
 let searching: boolean = false;
 let page: number = 1;
 let lastApiCall = 0;
-const MINIMUM_API_DELAY = 500;
+const MINIMUM_API_DELAY = 1000;
 const API_URL = "https://7tv.io/v3/gql";
 let savedvalue = "";
 
@@ -51,8 +52,7 @@ function GetEmoteURL(emote: SevenTVEmote) {
     return "https:" + emote.host.url + "/" + settings.store.imagesize + "." + extension;
 }
 
-async function FetchEmotes(value, handleRefresh) {
-
+async function GetEmotesFromSTV(value) {
     const currentTime = Date.now();
     const timeSinceLastCall = currentTime - lastApiCall;
     if (timeSinceLastCall < MINIMUM_API_DELAY)
@@ -94,17 +94,34 @@ async function FetchEmotes(value, handleRefresh) {
             "aspect_ratio": ""
         }
     };
-    fetch(API_URL, {
+
+    const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
         body: JSON.stringify({ query, variables })
-    }).then(response => response.json())
-        .then(data => {
-            emotes = data.data.emotes.items;
-            searching = false;
-            handleRefresh();
-        })
-        .catch(error => { console.error("[7TVEmotes] " + error); searching = false; });
+    });
+
+    if (!response.ok) {
+        console.error("[7TVEmotes] " + response);
+        searching = false;
+    }
+
+    return response.json();
+}
+
+async function FetchEmotes(value, handleRefresh) {
+    const data = await GetEmotesFromSTV(value);
+    emotes = data.data.emotes.items;
+    searching = false;
+    handleRefresh();
+}
+async function FetchAdditionalEmotes(value, handleRefresh) {
+    page += 1;
+    const data = await GetEmotesFromSTV(value);
+    const newemotes = data.data.emotes.items;
+    emotes.push(...newemotes);
+    searching = false;
+    handleRefresh();
 }
 
 
@@ -240,6 +257,35 @@ export default definePlugin({
         const [value, setValue] = useState<string>();
         const [count, setCount] = useState(0);
 
+        const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+        const [refCallback, isIntersecting] = useIntersection(true);
+
+        const handleScroll = () => {
+            const scrollContainer = scrollContainerRef.current;
+
+            if (!scrollContainer) return;
+
+            const { scrollTop, clientHeight, scrollHeight } = scrollContainer;
+
+            if (scrollTop + clientHeight === scrollHeight && isIntersecting) {
+                FetchAdditionalEmotes(value, handleRefresh);
+            }
+        };
+
+        useEffect(() => {
+            const scrollContainer = scrollContainerRef.current;
+
+            if (scrollContainer) {
+                scrollContainer.addEventListener("scroll", handleScroll);
+            }
+
+            return () => {
+                if (scrollContainer) {
+                    scrollContainer.removeEventListener("scroll", handleScroll);
+                }
+            };
+        }), [isIntersecting];
+
         const handleRefresh = () => {
             setCount(count + 1);
         };
@@ -280,67 +326,28 @@ export default definePlugin({
 
                     <Forms.FormDivider></Forms.FormDivider>
 
-                    <div className="seventv-emotes">
-                        {emotes.map(emote => (
-                            <Tooltip text={emote.name}>
-                                {({ onMouseEnter, onMouseLeave }) => (
-                                    <Button className="seventv-emotebutton"
-                                        look="BLANK"
-                                        size="ICON"
-                                        aria-haspopup="dialog"
-                                        onMouseEnter={onMouseEnter}
-                                        onMouseLeave={onMouseLeave}
-                                        datatype="emoji"
-                                        onClick={() => {
-                                            insertTextIntoChatInputBox(GetEmoteURL(emote));
-                                            closePopout();
-                                        }}
-                                    ><img src={GetEmoteURL(emote)} height="40px"></img></Button>
-                                )}
-                            </Tooltip>
-                        ))}
+                    <div className="scroll-wrapper" ref={refCallback}>
+                        <div className="seventv-emotes" ref={scrollContainerRef}>
+                            {emotes.map(emote => (
+                                <Tooltip text={emote.name}>
+                                    {({ onMouseEnter, onMouseLeave }) => (
+                                        <Button className="seventv-emotebutton"
+                                            look="BLANK"
+                                            size="ICON"
+                                            aria-haspopup="dialog"
+                                            onMouseEnter={onMouseEnter}
+                                            onMouseLeave={onMouseLeave}
+                                            datatype="emoji"
+                                            onClick={() => {
+                                                insertTextIntoChatInputBox(GetEmoteURL(emote));
+                                                closePopout();
+                                            }}
+                                        ><img src={GetEmoteURL(emote)} height="40px"></img></Button>
+                                    )}
+                                </Tooltip>
+                            ))}
+                        </div>
                     </div>
-
-                    <Forms.FormDivider></Forms.FormDivider>
-                    <br></br>
-
-                    <div className="seventv-navigation">
-                        <Button className="seventv-pagebutton"
-                            look={Button.Looks.BLANK}
-                            onClick={() => {
-                                if (!searching) {
-                                    page--;
-                                    FetchEmotes(value, handleRefresh);
-                                }
-                            }}
-                        >
-                            <svg fill="#000000" height="24px" width="24px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 490 490">
-                                <g>
-                                    <polygon fill="#b5bac1" points="242.227,481.919 314.593,407.95 194.882,290.855 490,290.855 490,183.86 210.504,183.86 314.593,82.051 242.227,8.081 0,244.996" />
-                                </g>
-                            </svg></Button>
-                        <Button className="seventv-pagebutton"
-                            look={Button.Looks.BLANK}
-                            onClick={() => {
-                                if (!searching) {
-                                    page++;
-                                    FetchEmotes(value, handleRefresh);
-                                }
-                            }}
-                        >
-                            <svg fill="#000000" height="24px" width="24px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 490 490">
-                                <g>
-                                    <g>
-                                        <polygon fill="#b5bac1" points="247.773,8.081 175.407,82.05 295.118,199.145 0,199.145 0,306.14 279.496,306.14 175.407,407.949 247.773,481.919 490,245.004" />
-                                    </g>
-                                </g>
-                            </svg></Button>
-                    </div>
-                </div>
-
-                <div className={cl("footer")}>
-                    <Forms.FormText className="seventv-pagetext">Page {page}</Forms.FormText>
                 </div>
             </div >
         );
