@@ -88,6 +88,10 @@ export const MessageDecorations = $MessageDecorations;
  */
 export const MemberListDecorators = $MemberListDecorators;
 /**
+ * An API allowing you to persist data
+ */
+export const Settings = $Settings;
+/**
  * An API allowing you to read, manipulate and automatically update components based on Discord settings
  */
 export const SettingsStore = $SettingsStore;

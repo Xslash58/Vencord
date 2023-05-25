@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { definePluginSettings } from "@api/settings";
+import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
@@ -24,7 +24,7 @@ import { findByCodeLazy } from "@webpack";
 import { GuildMemberStore, React, RelationshipStore, SelectedChannelStore } from "@webpack/common";
 import { User } from "discord-types/general";
 
-const Avatar = findByCodeLazy('"top",spacing:');
+const Avatar = findByCodeLazy(".typingIndicatorRef", "svg");
 const openProfile = findByCodeLazy("friendToken", "USER_PROFILE_MODAL_OPEN");
 
 const settings = definePluginSettings({
@@ -89,7 +89,11 @@ const TypingUser = ErrorBoundary.wrap(function ({ user, guildId }: Props) {
                         src={user.getAvatarURL(guildId, 128)} />
                 </div>
             )}
-            {GuildMemberStore.getNick(guildId!, user.id) || !guildId && RelationshipStore.getNickname(user.id) || user.username}
+            {GuildMemberStore.getNick(guildId!, user.id)
+                || (!guildId && RelationshipStore.getNickname(user.id))
+                || (user as any).globalName
+                || user.username
+            }
         </strong>
     );
 }, { noop: true });

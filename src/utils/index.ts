@@ -18,7 +18,7 @@
 
 
 export * from "./ChangeList";
-export * as Constants from "./constants";
+export * from "./constants";
 export * from "./debounce";
 export * from "./discord";
 export * from "./guards";
@@ -28,7 +28,8 @@ export * from "./margins";
 export * from "./misc";
 export * from "./modal";
 export * from "./onceDefined";
-export * from "./proxyLazy";
+export * from "./onlyOnce";
+export * from "./patches";
 export * from "./Queue";
 export * from "./react";
 export * from "./text";
