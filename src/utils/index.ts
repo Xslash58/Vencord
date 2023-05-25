@@ -16,14 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+
 export * from "./ChangeList";
 export * from "./constants";
 export * from "./debounce";
 export * from "./discord";
 export * from "./guards";
-export * from "./lazy";
-export * from "./localStorage";
-export * from "./Logger";
+export { default as IpcEvents } from "./IpcEvents";
+export { default as Logger } from "./Logger";
 export * from "./margins";
 export * from "./misc";
 export * from "./modal";
@@ -31,4 +31,13 @@ export * from "./onceDefined";
 export * from "./onlyOnce";
 export * from "./patches";
 export * from "./Queue";
+export * from "./react";
 export * from "./text";
+
+import * as t from "./types";
+
+export const types = {
+    // necessary so plugin repo's esbuild doesn't explode
+    __esModule: true,
+    ...t
+};

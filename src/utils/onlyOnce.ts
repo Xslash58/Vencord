@@ -16,14 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-export function onlyOnce<F extends Function>(f: F): F {
-    let called = false;
-    let result: any;
-    return function onlyOnceWrapper(this: unknown) {
-        if (called) return result;
+export { default as ErrorBoundary } from "./ErrorBoundary";
+export * from "./ErrorCard";
+export * from "./Flex";
+export * from "./Heart";
+export * from "./Link";
+export { default as PatchHelper } from "./PatchHelper";
+export { default as PluginSettings } from "./PluginSettings";
+export * from "./Switch";
+export { default as VencordSettings } from "./VencordSettings";
 
-        called = true;
-
-        return (result = f.apply(this, arguments));
-    } as unknown as F;
-}

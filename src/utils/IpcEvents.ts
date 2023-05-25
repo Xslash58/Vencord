@@ -31,3 +31,20 @@ export const enum IpcEvents {
     BUILD = "VencordBuild",
     OPEN_MONACO_EDITOR = "VencordOpenMonacoEditor",
 }
+
+export default strEnum({
+    QUICK_CSS_UPDATE: "VencordQuickCssUpdate",
+    GET_QUICK_CSS: "VencordGetQuickCss",
+    SET_QUICK_CSS: "VencordSetQuickCss",
+    GET_SETTINGS_DIR: "VencordGetSettingsDir",
+    GET_SETTINGS: "VencordGetSettings",
+    SET_SETTINGS: "VencordSetSettings",
+    OPEN_EXTERNAL: "VencordOpenExternal",
+    OPEN_QUICKCSS: "VencordOpenQuickCss",
+    GET_UPDATES: "VencordGetUpdates",
+    GET_REPO: "VencordGetRepo",
+    UPDATE: "VencordUpdate",
+    BUILD: "VencordBuild",
+    OPEN_MONACO_EDITOR: "VencordOpenMonacoEditor",
+    GET_PLUGINS: "VencordGetPlugins",
+} as const);
