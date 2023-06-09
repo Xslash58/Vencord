@@ -20,11 +20,13 @@ import "./styles.css";
 
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
+import { Logger } from "@utils/Logger";
 import { Devs } from "@utils/constants";
 import { getTheme, insertTextIntoChatInputBox, Theme } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, ButtonLooks, ButtonWrapperClasses, Forms, React, TextInput, Tooltip, useState } from "@webpack/common";
-import { Channel } from "discord-types/general";
+import { Button, ButtonLooks, ButtonWrapperClasses, Forms, Parser, React, TextInput, Tooltip, useState } from "@webpack/common";
+import { Channel, Message } from "discord-types/general";
+import { ReactElement, ReactNode } from "react";
 
 const cl = classNameFactory("vc-seventv-");
 
@@ -36,6 +38,8 @@ interface SevenTVEmote {
 interface SevenTVHost {
     url: string;
 }
+
+const emoteRegex = /\/emote\/([a-f0-9]+)\/\w+\.(?:png|webp|gif)/;
 
 let emotes: SevenTVEmote[] = [];
 let searching: boolean = false;
@@ -245,9 +249,182 @@ export default definePlugin({
                     }
                 }
             ]
+        },
+        {
+            find: '["strong","em","u","text","inlineCode","s","spoiler"]',
+            replacement: [
+                {
+                    predicate: () => true,
+                    match: /1!==(\i)\.length\|\|1!==\i\.length/,
+                    replace: (m, content) => `${m}||$self.shouldKeepEmoteLink(${content}[0])`
+                },
+                {
+                    predicate: () => true,
+                    match: /(?=return{hasSpoilerEmbeds:\i,content:(\i)})/,
+                    replace: (_, content) => `${content}=$self.patchFakeNitroEmojisOrRemoveStickersLinks(${content},arguments[2]?.formatInline);`
+                }
+            ]
+        },
+        {
+            find: "renderEmbeds=function",
+            replacement: [
+                {
+                    predicate: () => true,
+                    match: /(renderEmbeds=function\((\i)\){)(.+?embeds\.map\(\(function\((\i)\){)/,
+                    replace: (_, rest1, message, rest2, embed) => `${rest1}const fakeNitroMessage=${message};${rest2}if($self.shouldIgnoreEmbed(${embed},fakeNitroMessage))return null;`
+                    //replace: (_, rest1, message, rest2, embed) => `${rest1}const fakeNitroMessage=${message};${rest2}if(true)return null;`
+                }
+            ]
+        },
+        {
+            find: ".Messages.EMOJI_POPOUT_PREMIUM_JOINED_GUILD_DESCRIPTION",
+            predicate: () => true,
+            replacement: {
+                match: /((\i)=\i\.node,\i=\i\.emojiSourceDiscoverableGuild)(.+?return )(.{0,450}Messages\.EMOJI_POPOUT_PREMIUM_JOINED_GUILD_DESCRIPTION.+?}\))/,
+                replace: (_, rest1, node, rest2, reactNode) => `${rest1},fakeNitroNode=${node}${rest2}$self.addFakeNotice(${reactNode},fakeNitroNode.fake)`
+            }
         }
     ],
     settings,
+
+    clearEmptyArrayItems(array: Array<any>) {
+        return array.filter(item => item != null);
+    },
+
+    trimContent(content: Array<any>) {
+        const firstContent = content[0];
+        if (typeof firstContent === "string") content[0] = firstContent.trimStart();
+        if (content[0] === "") content.shift();
+
+        const lastIndex = content.length - 1;
+        const lastContent = content[lastIndex];
+        if (typeof lastContent === "string") content[lastIndex] = lastContent.trimEnd();
+        if (content[lastIndex] === "") content.pop();
+    },
+
+    shouldKeepEmoteLink(link: any) {
+        return link.target && emoteRegex.test(link.target);
+    },
+
+    ensureChildrenIsArray(child: ReactElement) {
+        if (!Array.isArray(child.props.children)) child.props.children = [child.props.children];
+    },
+
+    patchFakeNitroEmojisOrRemoveStickersLinks(content: Array<any>, inline: boolean) {
+        // If content has more than one child or it's a single ReactElement like a header or list
+        if ((content.length > 1 || typeof content[0]?.type === "string")) return content;
+
+        let nextIndex = content.length;
+
+        const transformLinkChild = (child: ReactElement) => {
+            const emoteMatch = child.props.href.match(emoteRegex);
+            if (emoteMatch) {
+                let url: URL | null = null;
+                try {
+                    url = new URL(child.props.href);
+                } catch { }
+
+                const emojiName = url?.searchParams.get("name") ?? "7TV Emote";
+
+                return Parser.defaultRules.customEmoji.react({
+                    jumboable: !inline && content.length === 1 && typeof content[0].type !== "string",
+                    animated: emoteMatch[2] === "gif",
+                    emojiId: emoteMatch[1],
+                    //animated: false,
+                    //emojiId: 1055659354931605567,
+                    name: emojiName,
+                    fake: true
+                }, void 0, { key: String(nextIndex++) });
+            }
+
+            return child;
+        };
+
+        const transformChild = (child: ReactElement) => {
+            if (child?.props?.trusted != null) return transformLinkChild(child);
+            if (child?.props?.children != null) {
+                if (!Array.isArray(child.props.children)) {
+                    child.props.children = modifyChild(child.props.children);
+                    return child;
+                }
+
+                child.props.children = modifyChildren(child.props.children);
+                if (child.props.children.length === 0) return null;
+                return child;
+            }
+
+            return child;
+        };
+
+        const modifyChild = (child: ReactElement) => {
+            const newChild = transformChild(child);
+
+            if (newChild?.type === "ul" || newChild?.type === "ol") {
+                this.ensureChildrenIsArray(newChild);
+                if (newChild.props.children.length === 0) return null;
+
+                let listHasAnItem = false;
+                for (const [index, child] of newChild.props.children.entries()) {
+                    if (child == null) {
+                        delete newChild.props.children[index];
+                        continue;
+                    }
+
+                    this.ensureChildrenIsArray(child);
+                    if (child.props.children.length > 0) listHasAnItem = true;
+                    else delete newChild.props.children[index];
+                }
+
+                if (!listHasAnItem) return null;
+
+                newChild.props.children = this.clearEmptyArrayItems(newChild.props.children);
+            }
+
+            return newChild;
+        };
+
+        const modifyChildren = (children: Array<ReactElement>) => {
+            for (const [index, child] of children.entries()) children[index] = modifyChild(child);
+
+            children = this.clearEmptyArrayItems(children);
+            this.trimContent(children);
+
+            return children;
+        };
+
+        try {
+            return modifyChildren(window._.cloneDeep(content));
+        } catch (err) {
+            new Logger("7TVEmotes").error(err);
+            return content;
+        }
+    },
+
+    shouldIgnoreEmbed(embed: Message["embeds"][number], message: Message) {
+        const contentItems = message.content.split(/\s/);
+        if (contentItems.length > 1) return false;
+
+        switch (embed.type) {
+            case "image": {
+                if (!contentItems.includes(embed.url!) && !contentItems.includes(embed.image!.proxyURL)) return false;
+
+                if (emoteRegex.test(embed.url!)) return true;
+
+                break;
+            }
+        }
+
+        return false;
+    },
+
+    addFakeNotice(node: Array<ReactNode>, fake: boolean) {
+        if (!fake) return node;
+
+        node = Array.isArray(node) ? node : [node];
+
+        node.push(" This is a 7TV Emote and renders like a real emoji only for you. Appears as a link to non-plugin users.");
+        return node;
+    },
 
     SevenTVComponent({
         channel,
