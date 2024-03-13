@@ -23,10 +23,11 @@ import { classNameFactory } from "@api/Styles";
 import { Devs } from "@utils/constants";
 import { getTheme, insertTextIntoChatInputBox, Theme } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, ButtonLooks, ButtonWrapperClasses, Forms, React, TextInput, Tooltip, useState } from "@webpack/common";
-import { Channel } from "discord-types/general";
+import { Button, Forms, React, TextInput, Tooltip, useState } from "@webpack/common";
 import { SevenTVBadges } from "./badges";
 import { Logger } from "@utils/Logger";
+import { addChatBarButton, ChatBarButton, removeChatBarButton } from "@api/ChatButtons";
+import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, openModal } from "@utils/modal";
 
 const cl = classNameFactory("vc-seventv-");
 
@@ -55,7 +56,7 @@ const cachedBadges = {};
 function GetEmoteURL(emote: SevenTVEmote) {
     const extension = emote.animated ? "gif" : "webp";
 
-    return "https:" + emote.host.url + "/" + settings.store.imagesize + "." + extension + "?name=" + emote.name;
+    return `https:${emote.host.url}/${settings.store.imagesize}.${extension}?name=${emote.name}`;
 }
 
 async function FetchEmotes(value, handleRefresh) {
@@ -223,6 +224,181 @@ async function checkBadge(id, name) {
     cachedBadges[name][id] = false;
 }
 
+const ChatBarIcon: ChatBarButton = ({ isMainChat }) => {
+    if (!isMainChat) return null;
+
+    return (
+        <ChatBarButton
+            tooltip="7TV"
+            onClick={() => {
+                const key = openModal(props => (
+                    <SevenTVComponent
+                        rootProps={props}
+                        closePopout={() => closeModal(key)}
+                    />
+                ));
+            }}
+            buttonProps={{ "aria-haspopup": "dialog" }}
+        >
+            <svg
+                width="32"
+                height="32"
+                viewBox="0 0 128 128"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <g fill="none" fill-rule="evenodd">
+                    <path
+                        d="M90.986 45.953L95.9196 37.3498L98.584 32.801L93.65 24.1978V24H67.3036L77.1712 41.2064L79.9344 45.953H90.986Z"
+                        fill="currentColor"
+                    />
+                    <path
+                        d="M36.6158 103.703L66.2184 52.0842L69.8692 45.7554L60.0016 28.549L57.2388 24.099H15.598L10.6642 32.7022L8 37.251L12.9338 45.8542V46.052H44.5098L19.841 89.068L16.3874 95.1992L21.3212 103.802V104H36.6158"
+                        fill="currentColor"
+                    />
+                    <path
+                        d="M77.862 103.703H92.9592L112.694 69.29L116.148 63.357L111.214 54.7538V54.556H96.0184L86.1508 71.7624L85.46 73.048L75.5924 55.8415L74.902 54.556L65.0344 71.7624L62.2716 76.5088L77.0728 102.318L77.862 103.703Z"
+                        fill="currentColor"
+                    />
+                </g>
+            </svg>
+
+        </ChatBarButton>
+    );
+};
+const SevenTVComponent = ({
+    rootProps,
+    closePopout
+}: {
+    rootProps: ModalProps,
+    closePopout: () => void;
+}) => {
+    const [value, setValue] = useState<string>();
+    const [count, setCount] = useState(0);
+
+    const handleRefresh = () => {
+        setCount(count + 1);
+    };
+
+    if ((value === undefined) && (savedvalue !== "undefined" && savedvalue !== ""))
+        setValue(savedvalue);
+    savedvalue = value + "";
+
+    if (emotes.length === 0)
+        FetchEmotes(value, handleRefresh);
+
+    return (
+        <ModalRoot {...rootProps} className={cl("picker")}>
+            <ModalHeader className={cl("picker-header")}>
+                <Forms.FormTitle tag="h1">
+                    7TV
+                </Forms.FormTitle>
+
+                <ModalCloseButton onClick={closePopout} />
+            </ModalHeader>
+
+            <ModalContent className={cl("picker-content")}>
+                <div className={cl("navigation")}>
+                    <TextInput className={cl("searchinput")}
+                        type="string"
+                        value={value}
+                        onChange={e => setValue(e)}
+                        placeholder="Search 7TV Emotes"
+                        spellCheck="false"
+                        style={{
+                            colorScheme: getTheme() === Theme.Light ? "light" : "dark",
+                        }}
+                        onKeyDown={e => {
+                            if (e.key === "Enter")
+                                if (!searching) {
+                                    page = 1;
+                                    FetchEmotes(value, handleRefresh);
+                                }
+                        }}
+                    />
+                    <div className={cl("searchbutton")} style={{
+                        boxSizing: "border-box"
+                    }} onClick={() => {
+                        if (!searching) {
+                            page = 1;
+                            FetchEmotes(value, handleRefresh);
+                        }
+                    }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="24px" height="24px">
+                            <path fill="#b5bac1" d="M 21 3 C 11.621094 3 4 10.621094 4 20 C 4 29.378906 11.621094 37 21 37 C 24.710938 37 28.140625 35.804688 30.9375 33.78125 L 44.09375 46.90625 L 46.90625 44.09375 L 33.90625 31.0625 C 36.460938 28.085938 38 24.222656 38 20 C 38 10.621094 30.378906 3 21 3 Z M 21 5 C 29.296875 5 36 11.703125 36 20 C 36 28.296875 29.296875 35 21 35 C 12.703125 35 6 28.296875 6 20 C 6 11.703125 12.703125 5 21 5 Z" />
+                        </svg>
+                    </div>
+                </div>
+
+
+
+                <Forms.FormDivider></Forms.FormDivider>
+
+                <div className={cl("emotes")}>
+                    {emotes.map(emote => (
+                        <Tooltip text={emote.name}>
+                            {({ onMouseEnter, onMouseLeave }) => (
+                                <Button className={cl("emotebutton")}
+                                    look="BLANK"
+                                    size="ICON"
+                                    aria-haspopup="dialog"
+                                    onMouseEnter={onMouseEnter}
+                                    onMouseLeave={onMouseLeave}
+                                    datatype="emoji"
+                                    onClick={() => {
+                                        insertTextIntoChatInputBox(GetEmoteURL(emote));
+                                        closePopout();
+                                    }}
+                                ><img src={GetEmoteURL(emote)} height="40px"></img></Button>
+                            )}
+                        </Tooltip>
+                    ))}
+                </div>
+
+
+            </ModalContent>
+            <ModalFooter className={cl("navigation-footer")}>
+                <div className={cl("footer")}>
+                    <Forms.FormText className={cl("pagetext")}>{lastError === "" ? (<>Page {page}</>) : (<>{lastError}</>)}</Forms.FormText>
+                </div>
+                <div className={cl("navigation-footer-arrows")}>
+                    <Button className={cl("pagebutton")}
+                        look={Button.Looks.BLANK}
+                        onClick={() => {
+                            if (!searching) {
+                                page--;
+                                FetchEmotes(value, handleRefresh);
+                            }
+                        }}
+                    >
+                        <svg fill="#000000" height="24px" width="24px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 490 490">
+                            <g>
+                                <polygon fill="#b5bac1" points="242.227,481.919 314.593,407.95 194.882,290.855 490,290.855 490,183.86 210.504,183.86 314.593,82.051 242.227,8.081 0,244.996" />
+                            </g>
+                        </svg></Button>
+                    <Button className={cl("pagebutton")}
+                        look={Button.Looks.BLANK}
+                        onClick={() => {
+                            if (!searching) {
+                                page++;
+                                FetchEmotes(value, handleRefresh);
+                            }
+                        }}
+                    >
+                        <svg fill="#000000" height="24px" width="24px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 490 490">
+                            <g>
+                                <g>
+                                    <polygon fill="#b5bac1" points="247.773,8.081 175.407,82.05 295.118,199.145 0,199.145 0,306.14 279.496,306.14 175.407,407.949 247.773,481.919 490,245.004" />
+                                </g>
+                            </g>
+                        </svg></Button>
+                </div>
+            </ModalFooter>
+        </ModalRoot >
+    );
+};
+
 const settings = definePluginSettings({
     show_badges: {
         type: OptionType.BOOLEAN,
@@ -295,233 +471,23 @@ const settings = definePluginSettings({
         ],
     }
 });
-
 export default definePlugin({
     name: "7TV",
-    description: "Search for 7TV Emotes in your Discord Client!",
-    authors: [Devs.Xslash, Devs.Arjix],
+    description: "Benefit from 7TV features inside your Discord Client!",
+    authors: [Devs.Xslash],
 
-    patches: [
-        {
-            find: ".Messages.EXPRESSION_PICKER_GIF",
-            replacement: [
-                {
-                    match: /null==\(null===\(\w=\w\.emojis\)\|\|void 0.*?\.consolidateGifsStickersEmojis.*?(\w)\.push\((\(0,\w\.jsx\))\((\w+),{disabled:\w,type:(\w)},"emoji"\)\)/,
-                    replace: (m, btnArray, jsx, compo, type) => {
-                        const c = "arguments[0].type";
-                        return `${m};(${c}?.submit?.button||${c}?.attachments)&&${btnArray}.push(${jsx}(${compo},{disabled:!(${c}?.submit?.button||${c}?.attachments),type:${type},emojiType:"7TV"},"7TV"))`;
-                    }
-                },
-                {
-                    match: /(\.Messages\.PREMIUM_TRIAL_TUTORIAL_EMOJI_TOOLTIP.*?;return.*?,\w+\(\)\.buttonContainer.*?children:\(0,\w+\.jsx\)\()(.*?)(,.*?active:((\w).*?),)/,
-                    replace: (_, head, comp, tail, emojiActive, activeView) => {
-                        const isSevenTv = "arguments[0]?.emojiType===\"7TV\"";
-                        const isActive = `(${isSevenTv}&&${activeView}==="7TV")||${emojiActive}`;
-                        const rest = tail.replace(emojiActive, isActive);
-
-                        return `${head}(${isSevenTv}?$self.chatBarIcon:${comp})${rest}`;
-                    }
-                },
-                {
-                    match: /(var \w=)(\w\.useCallback\(\(function\(\)\{\(0,\w+\.\w+\)\(.*?\.EMOJI,.*?);/,
-                    replace: (_, decl, cb) => {
-                        const newCb = cb.replace(/(?<=function\(\)\{\(.*?\)\().+?\.EMOJI/, "\"7TV\"");
-                        return `${decl}arguments[0]?.emojiType?${newCb}:${cb};`;
-                    }
-                },
-                {
-                    match: /role:"tablist",.{10,20}\.Messages\.EXPRESSION_PICKER_CATEGORIES_A11Y_LABEL,children:\[.*?\)\]}\)}\):null,.*?onSelectEmoji:\w.*?:null/s,
-                    replace: m => {
-                        const stickerTabRegex = /,(\(0,\w\.jsx\))\((\w+?),\{.{50,100}isActive:(\w)===.*?\.EMOJI,\s*?viewType:.*?EXPRESSION_PICKER_EMOJI}\)/;
-                        const res = m.replace(stickerTabRegex, (_m, jsx, tabHeaderComp, currentTab, stickerText) => {
-                            const isActive = `${currentTab}==="7TV"`;
-                            return (
-                                `${_m},${jsx}(${tabHeaderComp},{id:"seventv-picker-tab","aria-controls":"seventv-picker-tab-panel","aria-selected":${isActive},isActive:${isActive},autoFocus:true,viewType:"7TV",children:${jsx}("div",{children:"7TV"})})`
-                            );
-                        });
-
-                        return res.replace(/(\w)===.{1,10}\.EMOJI\?(\(0,\w\.jsx\)).*?(\{.*?\})\):null/, (_, currentTab, jsx, props) => {
-                            return `${_},${currentTab}==="7TV"?${jsx}($self.SevenTVComponent,${props}):null`;
-                        });
-                    }
-                }
-            ]
-        }
-    ],
     settings,
 
-    SevenTVComponent({
-        channel,
-        closePopout
-    }: {
-        channel: Channel,
-        closePopout: () => void;
-    }) {
-        const [value, setValue] = useState<string>();
-        const [count, setCount] = useState(0);
-
-        const handleRefresh = () => {
-            setCount(count + 1);
-        };
-
-        if ((value === undefined) && (savedvalue !== "undefined" && savedvalue !== ""))
-            setValue(savedvalue);
-        savedvalue = value + "";
-
-        if (emotes.length === 0)
-            FetchEmotes(value, handleRefresh);
-
-        return (
-            <div className={cl("picker")}>
-                <div className={cl("picker-content")}>
-                    <div className={cl("navigation-shadow")}>
-                        <div className={cl("navigation")}>
-                            <TextInput className={cl("searchinput")}
-                                type="string"
-                                value={value}
-                                onChange={e => setValue(e)}
-                                placeholder="Search 7TV Emotes"
-                                spellCheck="false"
-                                style={{
-                                    colorScheme: getTheme() === Theme.Light ? "light" : "dark",
-                                }}
-                                onKeyDown={e => {
-                                    if (e.key === "Enter")
-                                        if (!searching) {
-                                            page = 1;
-                                            FetchEmotes(value, handleRefresh);
-                                        }
-                                }}
-                            />
-                            <div className={cl("searchbutton")} style={{
-                                boxSizing: "border-box"
-                            }} onClick={() => {
-                                if (!searching) {
-                                    page = 1;
-                                    FetchEmotes(value, handleRefresh);
-                                }
-                            }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="24px" height="24px">
-                                    <path fill="#b5bac1" d="M 21 3 C 11.621094 3 4 10.621094 4 20 C 4 29.378906 11.621094 37 21 37 C 24.710938 37 28.140625 35.804688 30.9375 33.78125 L 44.09375 46.90625 L 46.90625 44.09375 L 33.90625 31.0625 C 36.460938 28.085938 38 24.222656 38 20 C 38 10.621094 30.378906 3 21 3 Z M 21 5 C 29.296875 5 36 11.703125 36 20 C 36 28.296875 29.296875 35 21 35 C 12.703125 35 6 28.296875 6 20 C 6 11.703125 12.703125 5 21 5 Z" />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-
-
-                    <Forms.FormDivider></Forms.FormDivider>
-
-                    <div className={cl("emotes")}>
-                        {emotes.map(emote => (
-                            <Tooltip text={emote.name}>
-                                {({ onMouseEnter, onMouseLeave }) => (
-                                    <Button className={cl("emotebutton")}
-                                        look="BLANK"
-                                        size="ICON"
-                                        aria-haspopup="dialog"
-                                        onMouseEnter={onMouseEnter}
-                                        onMouseLeave={onMouseLeave}
-                                        datatype="emoji"
-                                        onClick={() => {
-                                            insertTextIntoChatInputBox(GetEmoteURL(emote));
-                                            closePopout();
-                                        }}
-                                    ><img src={GetEmoteURL(emote)} height="40px"></img></Button>
-                                )}
-                            </Tooltip>
-                        ))}
-                    </div>
-
-
-                    <div className={cl("navigation-footer")}>
-                        <div className={cl("navigation-footer-arrows")}>
-                            <Button className={cl("pagebutton")}
-                                look={Button.Looks.BLANK}
-                                onClick={() => {
-                                    if (!searching) {
-                                        page--;
-                                        FetchEmotes(value, handleRefresh);
-                                    }
-                                }}
-                            >
-                                <svg fill="#000000" height="24px" width="24px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 490 490">
-                                    <g>
-                                        <polygon fill="#b5bac1" points="242.227,481.919 314.593,407.95 194.882,290.855 490,290.855 490,183.86 210.504,183.86 314.593,82.051 242.227,8.081 0,244.996" />
-                                    </g>
-                                </svg></Button>
-                            <Button className={cl("pagebutton")}
-                                look={Button.Looks.BLANK}
-                                onClick={() => {
-                                    if (!searching) {
-                                        page++;
-                                        FetchEmotes(value, handleRefresh);
-                                    }
-                                }}
-                            >
-                                <svg fill="#000000" height="24px" width="24px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 490 490">
-                                    <g>
-                                        <g>
-                                            <polygon fill="#b5bac1" points="247.773,8.081 175.407,82.05 295.118,199.145 0,199.145 0,306.14 279.496,306.14 175.407,407.949 247.773,481.919 490,245.004" />
-                                        </g>
-                                    </g>
-                                </svg></Button>
-                        </div>
-                        <div className={cl("footer")}>
-                            <Forms.FormText className={cl("pagetext")}>{lastError === "" ? (<>Page {page}</>) : (<>{lastError}</>)}</Forms.FormText>
-                        </div>
-                    </div>
-                </div>
-            </div >
-        );
-    },
-
-    chatBarIcon({
-        onClick,
-        active
-    }) {
-        return (
-            <Tooltip text="7TV Emotes">
-                {({ onMouseEnter, onMouseLeave }) => (
-                    <div style={{ display: "flex" }}>
-                        <Button
-                            aria-haspopup="dialog"
-                            aria-label=""
-                            size=""
-                            look={ButtonLooks.BLANK}
-                            onMouseEnter={onMouseEnter}
-                            onMouseLeave={onMouseLeave}
-                            innerClassName={ButtonWrapperClasses.button}
-                            onClick={onClick}
-                            className={cl("button")}
-                        >
-                            <div className={ButtonWrapperClasses.buttonWrapper}>
-                                <svg
-                                    aria-hidden="true"
-                                    role="img"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 109.6 80.9"
-                                    className={cl("chat-icon") + (active ? " active" : "")}
-                                >
-                                    <g>
-                                        <path d="M84.1,22.2l5-8.7,2.7-4.6L86.8.2V0H60.1l5,8.7,5,8.7,2.8,4.8H84.1"></path>
-                                        <path d="M29,80.6l5-8.7,5-8.7,5-8.7,5-8.7,5-8.7,5-8.7L62.7,22l-5-8.7-5-8.7L49.9.1H7.7l-5,8.7L0,13.4l5,8.7v.2h32l-5,8.7-5,8.7-5,8.7-5,8.7-5,8.7L8.5,72l5,8.7v.2H29"></path>
-                                        <path d="M70.8,80.6H86.1l5-8.7,5-8.7,5-8.7,5-8.7,3.5-6-5-8.7v-.2H89.2l-5,8.7-5,8.7-.7,1.3-5-8.7-5-8.7-.7-1.3-5,8.7-5,8.7L55,53.1l5,8.7,5,8.7,5,8.7.8,1.4"></path>
-                                    </g>
-                                </svg>
-                            </div>
-                        </Button>
-                    </div>
-                )
-                }
-            </Tooltip >
-        );
-    },
-
     start() {
+        addChatBarButton("SevenTV", ChatBarIcon);
+
         if (settings.store.show_badges)
             SevenTVBadges.forEach(badge => Vencord.Api.Badges.addBadge(badge));
     },
+    stop() {
+        removeChatBarButton("SevenTV");
+
+        if (settings.store.show_badges)
+            SevenTVBadges.forEach(badge => Vencord.Api.Badges.removeBadge(badge));
+    }
 });

@@ -31,17 +31,27 @@
     margin-top: 7px;
 }
 
+.vc-seventv-picker {
+    background-color: #2b2d31;
+}
+
+.vc-seventv-picker-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
 .vc-seventv-navigation {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
     margin: 0 auto;
-    width: 95%;
-}
+    width: 100%;
 
-.vc-seventv-navigation-shadow {
-    box-shadow: 0 1px 2px 0 black;
+    box-shadow: 0 3px 2px -2px black;
     height: 50px;
 }
 
@@ -72,9 +82,9 @@
 }
 
 .vc-seventv-navigation-footer {
+    display: flex;
+    flex-direction: column;
     background-color: #232428;
-    height: 100%;
-    width: 100%;
     padding: 5px;
 }
 
