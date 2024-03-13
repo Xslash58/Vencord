@@ -130,6 +130,22 @@ const XMASBadge: ProfileBadge = {
     shouldShow: ({ user }) => hasBadge(user.id, "XMAS Gifter"),
     link: STORE_URL
 };
+const Subtember2023: ProfileBadge = {
+    description: "7TV September Sub Event 2023",
+    image: "https://cdn.7tv.app/badge/6508d5bd55deb74f50368f40/3x",
+    position: BadgePosition.START,
+    props: BADGE_PROPS,
+    shouldShow: ({ user }) => hasBadge(user.id, "7TV September Sub Event 2023"),
+    link: STORE_URL
+};
+const NNYS2023: ProfileBadge = {
+    description: "7TV x NNYS 2023",
+    image: "https://cdn.7tv.app/badge/65786330ffc9d968e5102164/3x",
+    position: BadgePosition.START,
+    props: BADGE_PROPS,
+    shouldShow: ({ user }) => hasBadge(user.id, "NNYS 2023"),
+    link: STORE_URL
+};
 
 
 const TranslatorBadge: ProfileBadge = {
@@ -183,6 +199,8 @@ export const SevenTVBadges = [
     Year2QuarterBadge,
     Year2HalfBadge,
     Year2ThreeQuarterBadge,
+    Subtember2023,
+    NNYS2023,
     ModeratorBadge,
     AdminBadge
 ];
